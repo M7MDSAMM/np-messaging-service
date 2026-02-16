@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Internal Microservice URLs
+    |--------------------------------------------------------------------------
+    */
+
+    'notification_service' => [
+        'base_url' => env('NOTIFICATION_SERVICE_URL', 'http://localhost:8002/api/v1'),
+    ],
+
 ];
