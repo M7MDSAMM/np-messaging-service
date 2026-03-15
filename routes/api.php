@@ -14,13 +14,14 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::get('/health', function () {
-    return ApiResponse::success([
-        'service' => config('app.name'),
-        'status'  => 'ok',
-        'time'    => now()->toIso8601String(),
-    ], 'Service is healthy.');
-});
+Route::get('/health', fn () => ApiResponse::success([
+    'service'          => 'messaging-service',
+    'status'           => 'healthy',
+    'timestamp'        => now()->toIso8601String(),
+    'version'          => config('app.version', '1.0.0'),
+    'environment'      => app()->environment(),
+    'queue_connection' => config('queue.default'),
+]));
 
 Route::middleware('jwt.admin')->group(function () {
     Route::post('/deliveries', [DeliveryController::class, 'store']);

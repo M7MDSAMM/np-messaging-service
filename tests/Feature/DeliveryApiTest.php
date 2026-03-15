@@ -44,7 +44,7 @@ class DeliveryApiTest extends TestCase
         $response->assertOk()
             ->assertHeader('X-Correlation-Id')
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['correlation_id', 'data' => ['service', 'status', 'time']]);
+            ->assertJsonStructure(['correlation_id', 'data' => ['service', 'status', 'timestamp', 'environment']]);
     }
 
     // ── 2. Auth required ────────────────────────────────────────────────
