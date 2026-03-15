@@ -1,59 +1,101 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Messaging Service (Port 8003)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Stateless Laravel 12 JSON API responsible for **multi-channel message delivery**. It accepts delivery requests from the Notification Service, routes them to the appropriate channel provider (email, WhatsApp, push), tracks delivery attempts, and supports retry logic.
 
-## About Laravel
+## Responsibilities
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Accept batched delivery requests with per-channel recipient/content data.
+- Route deliveries to channel-specific providers (Email, WhatsApp, Push).
+- Track delivery attempts with provider message IDs and error details.
+- Retry failed deliveries with configurable max attempts (default: 3).
+- Delivery status tracking (pending / processing / sent / failed).
+- Queue-based async dispatch via `DispatchDeliveryJob`.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Database
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**Database:** `np_messaging_service`
 
-## Learning Laravel
+| Table | Purpose |
+|-------|---------|
+| `deliveries` | Delivery records: channel, recipient, subject, content, status, attempts count, provider info |
+| `delivery_attempts` | Individual attempt records per delivery with status, provider message ID, and errors |
+| `cache` | Laravel cache (standard) |
+| `jobs` | Laravel queue jobs for async delivery dispatch |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## API Endpoints
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+All routes are prefixed with `/api/v1` and require JWT authentication.
 
-## Laravel Sponsors
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Service health check |
+| `POST` | `/deliveries` | Create delivery requests (batch) |
+| `GET` | `/deliveries/{uuid}` | Get delivery details with attempts |
+| `POST` | `/deliveries/{uuid}/retry` | Retry a failed delivery |
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Create Deliveries Payload
 
-### Premium Partners
+```json
+{
+  "notification_uuid": "uuid",
+  "user_uuid": "uuid",
+  "deliveries": [
+    {
+      "channel": "email",
+      "recipient": "user@example.com",
+      "subject": "Welcome",
+      "content": "Hello Alex!",
+      "payload": {}
+    }
+  ]
+}
+```
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Architecture
 
-## Contributing
+- **Tech**: Laravel 12, PHP 8.2, MySQL.
+- **Auth**: RS256 JWT validation via `JwtAdminAuthMiddleware`. Tokens are issued by User Service.
+- **Middleware**:
+  - `CorrelationIdMiddleware` — propagates `X-Correlation-Id` on every request/response.
+  - `RequestTimingMiddleware` — logs method, route, status, latency, actor in structured JSON.
+  - `JwtAdminAuthMiddleware` — validates Bearer token.
+- **Providers**: Channel-specific provider implementations:
+  - `EmailProvider` — sends via Laravel Mail (`Mail::raw()`).
+  - `WhatsappProvider` — stub implementation (simulates delivery).
+  - `PushProvider` — stub implementation (simulates delivery).
+- **Queue**: `DispatchDeliveryJob` handles async delivery execution with attempt tracking.
+- **Responses**: Standardized API envelope (`success`, `message`, `data`, `meta`, `correlation_id`).
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Local Setup
 
-## Code of Conduct
+```bash
+cp .env.example .env
+composer install
+php artisan key:generate
+php artisan migrate
+php artisan serve --port=8003
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Requires MySQL with database `np_messaging_service` created.
 
-## Security Vulnerabilities
+For async delivery processing, start a queue worker:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan queue:work --queue=default --tries=3
+```
 
-## License
+## Testing
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan test
+```
+
+Tests run against MySQL database `np_messaging_service_test` (configured in `phpunit.xml`). Uses `RefreshDatabase` and `Queue::fake()` to verify job dispatch without executing providers.
+
+**Test coverage:** 13 tests, 94 assertions — covers delivery creation, batch processing, status tracking, retry, provider routing, validation, and auth.
+
+## Notes
+
+- WhatsApp and Push providers are currently stub implementations that simulate delivery and return mock provider message IDs.
+- Each delivery tracks its own `attempts_count` against `max_attempts` for retry logic.
+- Deliveries are soft-deleted for audit purposes.
