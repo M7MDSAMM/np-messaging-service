@@ -73,7 +73,9 @@ class DeliveryApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('message', 'Deliveries accepted.');
+            ->assertJsonPath('message', 'Deliveries accepted.')
+            ->assertJsonPath('data.notification_uuid', $payload['notification_uuid'])
+            ->assertJsonStructure(['data' => ['notification_uuid', 'deliveries']]);
 
         $this->assertDatabaseHas('deliveries', [
             'notification_uuid' => $payload['notification_uuid'],

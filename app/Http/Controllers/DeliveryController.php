@@ -15,9 +15,19 @@ class DeliveryController extends Controller
 
     public function store(DeliveryCreateRequest $request): JsonResponse
     {
-        $deliveries = $this->deliveryService->createDeliveries($request->validated());
+        $validated = $request->validated();
+        $deliveries = $this->deliveryService->createDeliveries($validated);
 
-        return ApiResponse::created($deliveries, 'Deliveries accepted.');
+        $responseData = [
+            'notification_uuid' => $validated['notification_uuid'],
+            'deliveries'        => collect($deliveries)->map(fn ($d) => [
+                'uuid'    => $d->uuid,
+                'channel' => $d->channel,
+                'status'  => $d->status,
+            ])->values()->all(),
+        ];
+
+        return ApiResponse::created($responseData, 'Deliveries accepted.');
     }
 
     public function show(string $uuid): JsonResponse
