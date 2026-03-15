@@ -44,7 +44,7 @@ class DeliveryApiTest extends TestCase
         $response->assertOk()
             ->assertHeader('X-Correlation-Id')
             ->assertJsonPath('success', true)
-            ->assertJsonStructure(['correlation_id', 'data' => ['service', 'status', 'timestamp', 'environment']]);
+            ->assertJsonStructure(['message', 'data' => ['service', 'status', 'timestamp', 'environment'], 'meta', 'correlation_id']);
     }
 
     // ── 2. Auth required ────────────────────────────────────────────────
@@ -56,7 +56,7 @@ class DeliveryApiTest extends TestCase
         $response->assertUnauthorized()
             ->assertJsonPath('success', false)
             ->assertJsonPath('error_code', 'AUTH_INVALID')
-            ->assertJsonStructure(['correlation_id']);
+            ->assertJsonStructure(['message', 'errors', 'error_code', 'correlation_id', 'meta']);
     }
 
     // ── 3. Create deliveries ────────────────────────────────────────────
@@ -246,7 +246,7 @@ class DeliveryApiTest extends TestCase
         $response->assertStatus(422)
             ->assertJsonPath('success', false)
             ->assertJsonPath('error_code', 'VALIDATION_ERROR')
-            ->assertJsonStructure(['errors', 'correlation_id']);
+            ->assertJsonStructure(['message', 'errors', 'error_code', 'correlation_id', 'meta']);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────

@@ -26,25 +26,36 @@ final class ApiResponse
         return self::success($data, $message, [], 201);
     }
 
+    public static function list(
+        array $data,
+        string $message = '',
+        ?array $pagination = null,
+    ): JsonResponse {
+        $meta = $pagination ? ['pagination' => $pagination] : (object) [];
+
+        return response()->json([
+            'success'        => true,
+            'message'        => $message,
+            'data'           => $data,
+            'meta'           => $meta,
+            'correlation_id' => request()->headers->get('X-Correlation-Id', ''),
+        ])->header('X-Correlation-Id', request()->headers->get('X-Correlation-Id', ''));
+    }
+
     public static function error(
         string $message,
         string $errorCode,
         int $status = 400,
         array $errors = [],
     ): JsonResponse {
-        $payload = [
+        return response()->json([
             'success'        => false,
             'message'        => $message,
+            'errors'         => $errors ?: (object) [],
             'error_code'     => $errorCode,
             'correlation_id' => request()->headers->get('X-Correlation-Id', ''),
             'meta'           => (object) [],
-        ];
-
-        if ($errors) {
-            $payload['errors'] = $errors;
-        }
-
-        return response()->json($payload, $status)
+        ], $status)
             ->header('X-Correlation-Id', request()->headers->get('X-Correlation-Id', ''));
     }
 
@@ -66,6 +77,11 @@ final class ApiResponse
     public static function validation(array $errors, string $message = 'Validation failed.'): JsonResponse
     {
         return self::error($message, 'VALIDATION_ERROR', 422, $errors);
+    }
+
+    public static function conflict(string $message = 'Conflict.', string $errorCode = 'CONFLICT', array $errors = []): JsonResponse
+    {
+        return self::error($message, $errorCode, 409, $errors);
     }
 
     public static function serverError(string $message = 'Internal server error.'): JsonResponse
